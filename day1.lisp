@@ -1,7 +1,7 @@
 (in-package :aoc-2021)
 
 (defun parse-file ()
- (parse-list (parse-number) (parse-newline)) )
+ (parse-list (parse-number) (parse-newline)))
 
 (defun sum-between (nums a b)
   (apply #'+ (subseq nums a b)))
@@ -25,4 +25,4 @@
 		 (sum-between parsed (- idx 3) idx))
 	  (incf part2)))
       
-      (finally (return (list  part1 part2))))))
+      (finally (return (list part1 part2))))))
