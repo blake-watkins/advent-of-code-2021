@@ -13,6 +13,18 @@
     (iter
       (with pos = 0)
       (with depth = 0)
+      (for (dir amount) in parsed)
+      (case dir
+        (:forward (incf pos amount))
+        (:up (decf depth amount))
+        (:down (incf depth amount)))
+      (finally (return (* pos depth))))))
+
+(defun day2 (input)
+  (let ((parsed (run-parser (parse-file) input)))
+    (iter
+      (with pos = 0)
+      (with depth = 0)
       (with aim = 0)
       (for (dir amount) in parsed)
       (case dir
