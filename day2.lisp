@@ -3,10 +3,8 @@
 (defun parse-file ()
   (parse-lines
    (with-monad
-     (assign dir
-             (either (then (parse-string  "forward ") (unit :forward))
-                     (then (parse-string  "down ") (unit :down))
-                     (then (parse-string  "up ") (unit :up))))
+     (assign dir (parse-keyword))
+     (parse-space)
      (assign amount (parse-number))
      (unit (list dir amount)))))
 
