@@ -19,18 +19,13 @@
 (defun get-rating (position numbers &key (oxygen-p t))
   (if (= 1 (length numbers))
       (car numbers)
-      (let ((most-common (elt (most-common numbers) position)))
-        (case most-common
-          (:eq (get-rating (1+ position)
-                           (keep-if position (if oxygen-p 1 0) numbers)
-                           :oxygen-p oxygen-p))
-          (t (get-rating (1+ position)
-                         (keep-if position
-                                  (if oxygen-p
-                                      most-common
-                                      (- 1 most-common))
-                                  numbers)
-                         :oxygen-p oxygen-p))))))
+      (let* ((most-common (elt (most-common numbers) position))
+             (keep-if (case most-common
+                        (:eq (if oxygen-p 1 0))
+                        (t (if oxygen-p most-common (- 1 most-common))))))
+        (get-rating (1+ position)
+                    (keep-if position keep-if numbers)
+                    :oxygen-p oxygen-p))))
 
 (defun day3 (input)
   (let* ((parsed (run-parser (parse-file) input))
