@@ -33,6 +33,13 @@
                          :oxygen-p oxygen-p))))))
 
 (defun day3 (input)
-  (let* ((parsed (run-parser (parse-file) input)))
+  (let* ((parsed (run-parser (parse-file) input))
+         (most-common (most-common parsed))
+         (gamma (digits-to-int most-common))
+         (epsilon (digits-to-int (mapcar (lambda (x) (- 1 x)) most-common))))
+    (* gamma epsilon)))
+
+(defun day3-2 (input)
+  (let ((parsed (run-parser (parse-file) input)))
     (* (digits-to-int (get-rating 0 parsed))
        (digits-to-int (get-rating 0 parsed :oxygen-p nil)))))
