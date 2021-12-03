@@ -5,13 +5,12 @@
 
 (defun most-common (numbers)
   (let* ((half-length (/ (length numbers) 2))
-         (one-counts (reduce (lambda (a b) (map 'list #'+ a b)) numbers))
-         (most-common (mapcar (lambda (c) (cond
-                                            ((= c half-length) :eq)
-                                            ((> c half-length) 1)
-                                            (t 0)))
-                              one-counts)))
-    most-common))
+         (one-counts (reduce (lambda (a b) (map 'list #'+ a b)) numbers)))
+    (mapcar (lambda (c) (cond
+                          ((> c half-length) 1)
+                          ((= c half-length) :eq)
+                          (t 0)))
+            one-counts)))
 
 (defun keep-if (position value numbers)
   (remove-if-not (lambda (word) (= (elt word position) value)) numbers))
