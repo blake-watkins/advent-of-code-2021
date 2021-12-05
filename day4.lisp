@@ -9,9 +9,6 @@
     (assign board (parse-list (parse-board) ""))
     (unit (list numbers board))))
 
-(defun mark-number (number board)
-  (subst :marked number board))
-
 (defun winning-p (board)
   (or
    (some (lambda (row) (every (lambda (n) (eq n :marked)) row)) board)
@@ -22,7 +19,7 @@
 (defun play (num-called numbers board)
   (when numbers      
     (let* ((called (car numbers))
-           (new-board (mark-number called board)))
+           (new-board (subst :marked called board)))
       (if (winning-p new-board)
           (list (1+ num-called) called new-board)
           (play (1+ num-called) (cdr numbers) new-board)))))
