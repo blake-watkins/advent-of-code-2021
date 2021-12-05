@@ -10,7 +10,7 @@
     (unit (list numbers board))))
 
 (defun mark-number (number board)
-  (mapcar (lambda (row) (substitute :marked number row)) board))
+  (subst :marked number board))
 
 (defun winning-p (board)
   (or
