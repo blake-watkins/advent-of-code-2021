@@ -25,13 +25,10 @@
           (play (1+ num-called) (cdr numbers) new-board)))))
 
 (defun score (called-number board)
-  (let ((sum (reduce #'+
-                     (mapcar (lambda (row)
-                               (reduce (lambda (a n)
-                                         (+ a (if (numberp n) n 0)))
-                                       row
-                                       :initial-value 0))
-                             board))))
+  (let ((sum (reduce (lambda (acc row)
+                       (+ acc (reduce #'+ row)))
+                     (subst 0 :marked board)
+                     :initial-value 0)))
     (* called-number sum)))
 
 (defun day4 (input)
