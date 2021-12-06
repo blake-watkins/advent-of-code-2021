@@ -1,11 +1,7 @@
 (in-package :aoc-2021)
 
 (defun parse-file ()
-  (parse-lines (with-monad
-                 (assign a (parse-number-list))
-                 (parse-string " -> ")
-                 (assign b (parse-number-list))
-                 (unit (list a b)))))
+  (parse-lines (parse-list (parse-number-list) (parse-string " -> "))))
 
 (defun day5 (input &optional (part2 nil))
   (let ((parsed (run-parser (parse-file) input))
