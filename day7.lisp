@@ -1,18 +1,13 @@
 (in-package :aoc-2021)
 
-(defun day7 (input)
+(defun day7 (input &optional (part1 nil))
   (let ((parsed (run-parser (parse-number-list) input)))
     (iter
       (for pos from (apply #'min parsed) to (apply #'max parsed))
-      (minimizing
-       (reduce #'+ (mapcar (lambda (v)
-			     (abs (- v pos)))
-			   parsed))
-       into part1)
-      (minimizing
-       (reduce #'+ (mapcar (lambda (v)
-			     (let ((d (abs (- v pos))))
-			       (/ (* d (1+ d)) 2)))
-			   parsed))
-       into part2)
-      (finally (return (list part1 part2))))))
+      (for dist = (if part1
+                      (lambda (v)
+                        (abs (- v pos)))
+                      (lambda (v)
+			(let ((d (abs (- v pos))))
+			  (/ (* d (1+ d)) 2)))))
+      (minimizing (reduce #'+ (mapcar dist parsed))))))
