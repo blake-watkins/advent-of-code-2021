@@ -1,10 +1,7 @@
 (in-package :aoc-2021)
 
-(defun parse-file ()
-  (parse-number-list))
-
 (defun day7 (input)
-  (let* ((parsed (run-parser (parse-file) input)))
+  (let ((parsed (run-parser (parse-number-list) input)))
     (iter
       (for pos from (apply #'min parsed) to (apply #'max parsed))
       (minimizing
