@@ -10,7 +10,7 @@
       (for (a b) in parsed)
       (for diff = (point- b a))
       (for dir = (point-signum diff))
-      (for steps = (1+ (apply #'max (point-abs diff))))
+      (for steps = (1+ (reduce #'max (point-abs diff))))
       (when (or part2 (find 0 diff))
 	(iter
 	  (repeat steps)

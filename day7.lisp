@@ -3,7 +3,7 @@
 (defun day7 (input &optional (part1 nil))
   (let ((parsed (run-parser (parse-number-list) input)))
     (iter
-      (for pos from (apply #'min parsed) to (apply #'max parsed))
+      (for pos from (reduce #'min parsed) to (reduce #'max parsed))
       (for dist = (if part1
                       (lambda (v)
                         (abs (- v pos)))

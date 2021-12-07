@@ -4,7 +4,7 @@
  (parse-list (parse-number) (parse-newline)))
 
 (defun sum-between (nums a b)
-  (apply #'+ (subseq nums a b)))
+  (reduce #'+ (subseq nums a b)))
 
 (defun day1 (input)
   (let ((parsed (run-parser (parse-file) input)))
