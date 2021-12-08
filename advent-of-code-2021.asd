@@ -5,7 +5,12 @@
   :licence "GNU General Public License (GPL) version 3"
   :depends-on ("advent-of-code" "iterate" "fset")
   :components ((:file "package")
+               (:file "game" :depends-on ("package"))
                (:file "day1" :depends-on ("package"))
                (:file "day2" :depends-on ("package"))
                (:file "day3" :depends-on ("package"))
-               (:file "day4" :depends-on ("package"))))
+               (:file "day4" :depends-on ("package"))
+               (:file "day5" :depends-on ("package"))
+               (:file "day6" :depends-on ("package"))
+               (:file "day7" :depends-on ("package"))
+               (:file "day8" :depends-on ("package" "game"))))

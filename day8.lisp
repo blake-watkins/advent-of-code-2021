@@ -6,49 +6,69 @@
     (unit (fset:convert 'fset:set word))))
 
 (defun parse-file ()
-  (parse-lines (parse-list (parse-list (parse-pattern) #\Space) (parse-string " | "))))
-
-(defun decode-words (words)
-  (let ((ret (make-hash-table :test 'equal))
-        (lengths (make-hash-table)))
-    (iter
-      (for word in words)
-      (cond
-        ((member (fset:size word) '(2 3 4 7))
-         (case (fset:size word)
-           (2 (setf (gethash 1 ret) word))
-           (3 (setf (gethash 7 ret) word))
-           (4 (setf (gethash 4 ret) word))
-           (7 (setf (gethash 8 ret) word))))
-        (t (push word (gethash (fset:size word) lengths)))))
-    (iter
-      (for word in (gethash 6 lengths))
-      (cond
-        ((= 2 (fset:size (fset:intersection (gethash 7 ret) word)))
-         (setf (gethash 6 ret) word))
-        ((= 4 (fset:size (fset:intersection (gethash 4 ret) word)))
-         (setf (gethash 9 ret) word))
-        (t (setf (gethash 0 ret) word))))
-    (iter
-      (for word in (gethash 5 lengths))
-      (cond
-        ((= 5 (fset:size (fset:intersection (gethash 6 ret) word)))
-         (setf (gethash 5 ret) word))
-        ((= 2 (fset:size (fset:intersection (gethash 1 ret) word)))
-         (setf (gethash 3 ret) word))
-        (t (setf (gethash 2 ret) word))))
-    ret))
+  (parse-lines
+   (parse-list (parse-list (parse-pattern) #\Space) (parse-string " | "))))
 
 (defun day8 (input)
   (let ((parsed (run-parser (parse-file) input)))
     (iter
-      (for (pattern words) in parsed)
-      (for table = (decode-words pattern))
-      (summing
-       (digits-to-int
-        (iter
-          (for word in words)
-          (collect (iter
-                     (for (d w) in-hashtable table)
-                     (finding d such-that (eq :equal (fset:compare w word))))))
-        :base 10)))))
+      (for (patterns words) in parsed)
+      (summing (iter
+                 (for word in words)
+                 (count (member (fset:size word) '(2 3 4 7))))))))
+
+;; PICK and DECODE-PATTERNS are Game monad functions. PICK uses the AMB operator
+;; to choose an element from a list that will pass subsequent GUARD calls. 
+
+;; The state in the game monad is the list of the (initially) 10 different patterns.
+(defun pick (&key size)
+  (with-monad
+    (assign remaining (get-state))
+    (assign choice (amb remaining))
+    (guard (= size (fset:size choice)))
+    (set-state (remove choice remaining))
+    (unit choice)))
+
+(defun decode-patterns ()
+  (with-monad
+    (assign one (pick :size 2))
+    (assign four (pick :size 4))
+    (assign seven (pick :size 3))
+    (assign eight (pick :size 7))
+
+    (assign six (pick :size 6))
+    (guard (= 1 (num-intersections-with six one)))
+    (assign nine (pick :size 6))
+    (guard (= 4 (num-intersections-with nine four)))
+    (assign zero (pick :size 6))
+
+    (assign three (pick :size 5))
+    (guard (= 2 (num-intersections-with three one)))
+    (assign two (pick :size 5))
+    (guard (= 2 (num-intersections-with two four)))
+    (assign five (pick :size 5))
+
+    (unit (list zero one two three four five six seven eight nine))))
+
+(defun day8-2 (input)
+  (let ((parsed (run-parser (parse-file) input)))
+    (iter
+      (for (patterns words) in parsed)
+      (for mapping = (first (run-game (decode-patterns) patterns)))
+      (summing (digits-to-int
+                (mapcar (lambda (w)
+                          (fset:lookup (convert-to-map mapping) w))
+                        words)
+                :base 10)))))
+
+(defun num-intersections-with (a b)
+  (fset:size (fset:intersection a b)))
+
+(defun convert-to-map (words)
+  (fset:convert 'fset:map
+                (iter
+                  (for val from 0)
+                  (for word in words)
+                  (collect (cons word val)))))
+
+
