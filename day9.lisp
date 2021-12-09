@@ -32,22 +32,28 @@
             (setf queue (fset:with-last queue n))))))
     (fset:size seen)))
 
-(defun day9 (input)
-  (let ((parsed (run-parser (parse-file) input))
-        (sinks (make-hash-table :test 'equal)))
+(defun get-sinks (map)
+  (iter
+    (with sinks = '())
+    (for r below (length map))
     (iter
-      (for r below (length parsed))
-      (summing (iter
-                 (for c below (length (first parsed)))
-                 (for height = (height (list r c) parsed))
-                 (for neighbours = (neighbours (list r c) parsed))
-                 (when (every (lambda (n) (< height (height n parsed)))
-                              (neighbours (list r c) parsed))
-                   (setf (gethash (list r c) sinks) t)
-                   (summing (1+ (height (list r c) parsed)))))))
+      (for c below (length (first map)))
+      (for height = (height (list r c) map))
+      (for neighbours = (neighbours (list r c) map))
+      (when (every (lambda (n) (< height (height n map)))
+                   (neighbours (list r c) map))
+        (setf sinks (cons (list r c) sinks))))
+    (finally (return sinks))))
+
+(defun day9 (input)
+  (let* ((parsed (run-parser (parse-file) input))
+         (sinks (get-sinks parsed))
+         (part1 (iter
+                  (for sink in sinks)
+                  (summing (1+ (height sink parsed))))))
 
     (let ((sizes (iter
-                   (for (sink nil) in-hashtable sinks)
+                   (for sink in sinks)
                    (collect (fill-map sink parsed)))))
       (setf sizes (sort sizes #'>))
-      (reduce #'* (subseq sizes 0 3)))))
+      (list part1 (reduce #'* (subseq sizes 0 3))))))
