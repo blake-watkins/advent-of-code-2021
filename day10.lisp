@@ -3,7 +3,7 @@
 (defun parse-file ()
   (parse-lines (parse-list (parse-character "({[<>]})") "")))
 
-(defun match-char (char)
+(defun closing-char (char)
   (ecase char (#\( #\)) (#\[ #\]) (#\{ #\}) (#\< #\>)))
 
 (defun parse-syntax (chars)
@@ -11,7 +11,7 @@
     (with closing = ())
     (for char in chars)
     (cond
-      ((find char "({[<") (push (match-char char) closing))
+      ((find char "({[<") (push (closing-char char) closing))
       ((char= char (first closing)) (pop closing))
       (t (leave (list :corrupted char))))
     (finally (return (if (= 0 (length closing))
@@ -40,6 +40,3 @@
       (:corrupted (summing (score-char item) into part1))
       (:incomplete (collecting (score-closing item) into part2-scores)))
     (finally (return (list part1 (median part2-scores))))))
-
-
-
