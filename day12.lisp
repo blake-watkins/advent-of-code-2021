@@ -1,31 +1,27 @@
 (in-package :aoc-2021)
 
-(defun parse-cave ()
-  (with-monad
-    (assign cave (parse-characters #'alpha-char-p))
-    (unit (list (if (upper-case-p (elt cave 0)) :big :little) cave))))
-
 (defun parse-file ()
-  (parse-lines (parse-list (parse-cave) "-")))
+  (parse-lines (parse-list (parse-characters #'alpha-char-p) "-")))
 
-(defun num-paths-from (cave path double-visit caves)
-  (if (equal cave '(:little "end"))
+(defun big-cave-p (cave)
+  (upper-case-p (elt cave 0)))
+
+(defun num-paths-from (cave path allow-repeat caves)
+  (if (equal cave "end")
       1
       (iter
         (for neighbour in-fset (fset:lookup caves cave))
-        (for (type name) = neighbour)
         (for visited-p = (fset:find neighbour path))
 
-        (when (or (eq type :big)
+        (when (or (big-cave-p neighbour)
                   (not visited-p)
-                  (and (not double-visit)
-                       (not (equal name "start"))))
-          (summing (num-paths-from-2 neighbour
-                                     (fset:with-last path cave)
-                                     (or double-visit
-                                         (and visited-p
-                                              (eq type :little)))
-                                     caves))))))
+                  (and allow-repeat (not (equal neighbour "start"))))
+          (sum (num-paths-from neighbour
+                               (fset:with-last path cave)
+                               (and allow-repeat
+                                    (or (big-cave-p neighbour)
+                                        (not visited-p)))
+                               caves))))))
 
 (defun get-caves (parsed)
   (iter
@@ -35,7 +31,7 @@
     (fset:adjoinf (fset:lookup ret to) from)
     (finally (return ret))))
 
-(defun day12 (input &optional (part1 nil))
+(defun day12 (input &key (part 2))
   (let* ((parsed (run-parser (parse-file) input))
          (caves (get-caves parsed)))
-    (num-paths-from '(:little "start") (fset:empty-seq) part1 caves)))
+    (num-paths-from "start" (fset:empty-seq) (= part 2) caves)))
