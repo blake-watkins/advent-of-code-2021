@@ -1,31 +1,14 @@
 (in-package :aoc-2021)
 
 (defun parse-cave ()
-  (either (with-monad
-            (assign cave (parse-characters #'upper-case-p))
-            (unit (list :big cave)))
-          (with-monad
-            (assign cave (parse-characters #'lower-case-p))
-            (unit (list :little cave)))))
+  (with-monad
+    (assign cave (parse-characters #'alpha-char-p))
+    (unit (list (if (upper-case-p (elt cave 0)) :big :little) cave))))
 
 (defun parse-file ()
   (parse-lines (parse-list (parse-cave) "-")))
 
-(defun num-paths-from (cave path caves)
-  (if (equal cave '(:little "end"))
-      1
-      (iter
-        (for neighbour in-fset (fset:lookup caves cave))
-        (for type = (first neighbour))
-        (for visited-p = (fset:find neighbour path))
-        
-        (when (or (eq type :big)
-                  (not visited-p))
-          (summing (num-paths-from neighbour
-                                   (fset:with-last path cave)
-                                   caves))))))
-
-(defun num-paths-from-2 (cave path double-visit caves)
+(defun num-paths-from (cave path double-visit caves)
   (if (equal cave '(:little "end"))
       1
       (iter
@@ -52,14 +35,7 @@
     (fset:adjoinf (fset:lookup ret to) from)
     (finally (return ret))))
 
-(defun day12 (input)
+(defun day12 (input &optional (part1 nil))
   (let* ((parsed (run-parser (parse-file) input))
-         (caves (get-caves parsed))
-         (part1 (num-paths-from '(:little "start")
-                                (fset:empty-seq)
-                                caves))
-         (part2 (num-paths-from-2 '(:little "start")
-                                  (fset:empty-seq)
-                                  nil
-                                  caves)))
-    (list part1 part2)))
+         (caves (get-caves parsed)))
+    (num-paths-from '(:little "start") (fset:empty-seq) part1 caves)))
