@@ -16,7 +16,7 @@
       1
       (iter
         (for neighbour in-fset (fset:lookup caves cave))
-        (for (type nil) = neighbour)
+        (for type = (first neighbour))
         (for visited-p = (fset:find neighbour path))
         
         (when (or (eq type :big)
