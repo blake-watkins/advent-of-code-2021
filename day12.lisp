@@ -48,8 +48,8 @@
   (iter
     (with ret = (fset:empty-map (fset:empty-set)))
     (for (from to) in parsed)
-    (setf (fset:lookup ret from) (fset:with (fset:lookup ret from) to))
-    (setf (fset:lookup ret to) (fset:with (fset:lookup ret to) from))
+    (fset:adjoinf (fset:lookup ret from) to)
+    (fset:adjoinf (fset:lookup ret to) from)
     (finally (return ret))))
 
 (defun day12 (input)
