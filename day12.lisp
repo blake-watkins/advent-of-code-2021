@@ -22,7 +22,7 @@
         (when (or (eq type :big)
                   (not visited-p))
           (summing (num-paths-from neighbour
-                                   (fset:push-last path cave)
+                                   (fset:with-last path cave)
                                    caves))))))
 
 (defun num-paths-from-2 (cave path double-visit caves)
