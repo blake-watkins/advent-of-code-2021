@@ -15,47 +15,51 @@
   (if (equal cave '(:little "end"))
       1
       (iter
-        (for (neighbour-type neighbour) in-fset (fset:lookup caves cave))
-        (when (or (eq neighbour-type :big)
-                  (not (fset:find (list neighbour-type neighbour)path)))
-          (summing (num-paths-from (list neighbour-type neighbour)
+        (for neighbour in-fset (fset:lookup caves cave))
+        (for (type nil) = neighbour)
+        (for visited-p = (fset:find neighbour path))
+        
+        (when (or (eq type :big)
+                  (not visited-p))
+          (summing (num-paths-from neighbour
                                    (fset:push-last path cave)
                                    caves))))))
 
-(defun num-paths-from-2 (cave path double-small caves)
+(defun num-paths-from-2 (cave path double-visit caves)
   (if (equal cave '(:little "end"))
       1
       (iter
-        (for (neighbour-type neighbour) in-fset (fset:lookup caves cave))
-        (let ((num-visited (fset:count-if
-                            (lambda (p)
-                              (equal p (list neighbour-type neighbour)))
-                            path)))
-          (when (or (eq neighbour-type :big)
-                    (= num-visited 0)
-                    (and (= num-visited 1)
-                         (not double-small)
-                         (not (string-equal neighbour "start"))))
-            (summing (num-paths-from-2 (list neighbour-type neighbour)
-                                       (fset:with-last path cave)
-                                       (or double-small
-                                           (and (eq neighbour-type :little)
-                                                (= num-visited 1)))
-                                       caves)))))))
+        (for neighbour in-fset (fset:lookup caves cave))
+        (for (type name) = neighbour)
+        (for visited-p = (fset:find neighbour path))
 
+        (when (or (eq type :big)
+                  (not visited-p)
+                  (and (not double-visit)
+                       (not (equal name "start"))))
+          (summing (num-paths-from-2 neighbour
+                                     (fset:with-last path cave)
+                                     (or double-visit
+                                         (and visited-p
+                                              (eq type :little)))
+                                     caves))))))
+
+(defun get-caves (parsed)
+  (iter
+    (with ret = (fset:empty-map (fset:empty-set)))
+    (for (from to) in parsed)
+    (setf (fset:lookup ret from) (fset:with (fset:lookup ret from) to))
+    (setf (fset:lookup ret to) (fset:with (fset:lookup ret to) from))
+    (finally (return ret))))
 
 (defun day12 (input)
   (let* ((parsed (run-parser (parse-file) input))
-         (caves (iter
-                  (with ret = (fset:empty-map (fset:empty-set)))
-                  (for (from to) in parsed)
-                  (setf ret (fset:with ret from
-                                       (fset:with (fset:lookup ret from) to)))
-                  (setf ret (fset:with ret to
-                                       (fset:with (fset:lookup ret to) from)))
-                  (finally (return ret)))))
-
-    (num-paths-from-2 '(:little "start")
-                      (fset:empty-seq)
-                      nil
-                      caves)))
+         (caves (get-caves parsed))
+         (part1 (num-paths-from '(:little "start")
+                                (fset:empty-seq)
+                                caves))
+         (part2 (num-paths-from-2 '(:little "start")
+                                  (fset:empty-seq)
+                                  nil
+                                  caves)))
+    (list part1 part2)))
