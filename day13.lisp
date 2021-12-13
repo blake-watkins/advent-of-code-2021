@@ -23,18 +23,15 @@
       (- (* 2 coord) c)
       c))
 
-(defun fold (folds dots)
-  (if (null folds)
-      dots      
-      (destructuring-bind (axis coord) (first folds)
-	(fold (rest folds)
-	      (fset:image
-	       (lambda (p)
-		 (destructuring-bind (x y) p
-		   (case axis
-		     (:x (list (reflect-about coord x) y))
-		     (:y (list x (reflect-about coord y))))))
-	       dots)))))
+(defun fold (dots fold)
+  (destructuring-bind (axis coord) fold
+    (fset:image
+     (lambda (p)
+       (destructuring-bind (x y) p
+	 (case axis
+	   (:x (list (reflect-about coord x) y))
+	   (:y (list x (reflect-about coord y))))))
+     dots)))
 
 (defun print-code (coords)
   (iter
@@ -52,7 +49,7 @@
     (if (= part 1)
 	(progn
 	  (setf folds (subseq folds 0 1))
-	  (fset:size (fold folds dots)))
-	(print-code (fold folds dots)))))
+	  (fset:size (fset:reduce #'fold folds :initial-value dots)))
+	(print-code (fset:reduce #'fold folds :initial-value dots)))))
 
 
