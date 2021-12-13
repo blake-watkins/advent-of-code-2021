@@ -1,51 +1,58 @@
 (in-package :aoc-2021)
 
+(defun parse-fold ()
+  (with-monad
+    (parse-string "fold along ")
+    (assign axis (with-monad
+		   (assign axis (parse-character "xy"))
+		   (unit (if (char= axis #\x) :x :y))))		     
+    (parse-character #\=)
+    (assign amount (parse-number))
+    (unit (list axis amount))))
+
 (defun parse-file ()
   (with-monad
     (assign dots (parse-lines (parse-number-list)))
     (parse-newline)
     (parse-newline)
-    (assign folds (parse-lines
-		   (with-monad
-		     (parse-string "fold along ")
-		     (assign axis (with-monad
-				    (assign char (parse-character "xy"))
-				    (parse-character #\=)
-				    (unit (if (char= char #\y) :y :x))))
-		     (assign amount (parse-number))
-		     (unit (list  axis amount)))))
-    (unit (list dots  folds))))
+    (assign folds (parse-lines (parse-fold)))
+    (unit (list (fset:convert 'fset:set dots) folds))))
 
-(defun fold-along-y (coord)
-  (lambda (p)
-    (list (first p) (if (> (second p) coord)
-			(- (* 2 coord) (second p))
-			(second p)))))
+(defun reflect-about (coord c)
+  (if (> c coord)
+      (- (* 2 coord) c)
+      c))
 
-(defun fold-along-x (coord)
-  (lambda (p)
-    (list  (if (> (first p) coord)
-	       (- (* 2 coord) (first p))
-	       (first p))
-	   (second p))))
-
-
-(defun day13 (input)
-  (destructuring-bind (dots folds) (run-parser (parse-file) input)
-    (setf dots (fset:convert 'fset:set dots))
-    (iter
-      (for (axis coord) in folds)
-      (setf dots (fset:image (if (eq axis :y)
-				 (fold-along-y coord)
-				 (fold-along-x coord))
-			     dots))
-      (finally (return dots)))))
+(defun fold (folds dots)
+  (if (null folds)
+      dots      
+      (destructuring-bind (axis coord) (first folds)
+	(fold (rest folds)
+	      (fset:image
+	       (lambda (p)
+		 (destructuring-bind (x y) p
+		   (case axis
+		     (:x (list (reflect-about coord x) y))
+		     (:y (list x (reflect-about coord y))))))
+	       dots)))))
 
 (defun print-code (coords)
   (iter
-    (with ((min-x min-y) (max-x max-y)) = (get-min-max coords))
-    (for y from min-y to max-y)
+    (with (max-x max-y) = (fset:reduce (lambda (acc coord)
+					 (map 'list #'max acc coord))
+				       coords))
+    (for y to max-y)
     (format t "~{~a~}~%"
 	    (iter
-	      (for x from min-x  to max-x)
+	      (for x to max-x)
 	      (collect (if (fset:contains? coords (list x y)) #\* #\Space))))))
+
+(defun day13 (input &key (part 2))
+  (destructuring-bind (dots folds) (run-parser (parse-file) input)
+    (if (= part 1)
+	(progn
+	  (setf folds (subseq folds 0 1))
+	  (fset:size (fold folds dots)))
+	(print-code (fold folds dots)))))
+
+
