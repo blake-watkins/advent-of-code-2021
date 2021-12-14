@@ -70,8 +70,7 @@
   (let* ((parsed (run-parser (parse-file) input)))
     (destructuring-bind (polymer templates) parsed
       (iter
-        (repeat 7)
-        (format t "~a~%" polymer)
+        (repeat 10)
         (setf polymer (expand polymer templates)))
       (iter
         (with ret = (fset:empty-bag))
