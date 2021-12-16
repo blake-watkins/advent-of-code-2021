@@ -18,8 +18,8 @@
 (defun parse-number-data (&optional (acc 0))
   (with-monad
     (assign more-bits-p (parse-bit))
-    (assign data-bits (n-of 4 (parse-bit)))
-    (let ((new-acc (+ (* acc 16) (digits-to-int data-bits))))
+    (assign value (parse-number-field 4))
+    (let ((new-acc (+ (* acc 16) value)))
       (if (= 0 more-bits-p)
           (unit new-acc)
           (parse-number-data new-acc)))))
