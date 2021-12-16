@@ -49,9 +49,6 @@
                      (parse-operator-data)))
     (unit (list version type data))))
 
-(defun operator-type (type-id)
-  )
-
 (defun add-versions (packet)
   (destructuring-bind (version opcode data) packet
     (if (eq :num opcode)
