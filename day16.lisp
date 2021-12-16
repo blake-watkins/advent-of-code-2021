@@ -1,5 +1,15 @@
 (in-package :aoc-2021)
 
+(defun parse-file ()
+  (with-monad
+    (assign chars (parse-list (parse-alphanumeric) ""))
+    (let ((values (mapcar (lambda (c)
+                            (if (upper-case-p c)
+                                (- (char-code c) (char-code #\A) -10)
+                                (- (char-code c) (char-code #\0))))
+                          chars)))
+      (unit (format nil "~{~4,'0B~}" values)))))
+
 (defun map-operator (op)
   (case op
     (0 :sum)
@@ -77,8 +87,8 @@
             ret)))))
 
 (defun day16 (input &key (part 2))
-  (let* ((bits (format nil "~B~%" (parse-integer input :radix 16)))
-         (packet (run-parser (parse-packet) bits)))
+  (let* ((bit-string (run-parser (parse-file) input) )
+         (packet (run-parser (parse-packet) bit-string)))
     (if (= part 1)
         (add-versions packet)
         (eval-packet packet))))
