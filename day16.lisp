@@ -30,26 +30,25 @@
     (if (= length-type-id 0)
         (with-monad
           (assign length (parse-number-field 15))
-          (parse-subparser length (parse-packets)))
+          (parse-subparser length (parse-list (parse-packet) "")))
         (with-monad
           (assign length (parse-number-field 11))
           (n-of length (parse-packet))))))
-
-(defun parse-packets ()
-  (parse-list (parse-packet) ""))
 
 (defun parse-packet ()
   (with-monad
     (assign version (parse-number-field 3))
     (assign type-id (parse-number-field 3))
-    (assign data
-            (if (= type-id 4)
-                (parse-number-data)
-                (parse-operator-data)))
-    (unit (list version (map-operator type-id) data))))
+    (let ((type (operator-type type-id)))
+      (with-monad
+        (assign data
+                (if (eq type :num)
+                    (parse-number-data)
+                    (parse-operator-data)))
+        (unit (list version type data))))))
 
-(defun map-operator (op)
-  (aref #(+ * min max :num > < =) op))
+(defun operator-type (type-id)
+  (aref #(+ * min max :num > < =) type-id))
 
 (defun add-versions (packet)
   (destructuring-bind (version opcode data) packet
