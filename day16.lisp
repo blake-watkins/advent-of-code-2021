@@ -30,7 +30,7 @@
     (if (= length-type-id 0)
         (with-monad
           (assign length (parse-number-field 15))
-          (parse-subparser (parse-packets) length))
+          (parse-subparser length (parse-packets)))
         (with-monad
           (assign length (parse-number-field 11))
           (n-of length (parse-packet))))))
