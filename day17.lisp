@@ -9,31 +9,33 @@
     (unit (list x y))))
 
 (defun within (point target)
-  (every (lambda (coord range) (<= (first range) coord (second range)))
+  (every (lambda (coord range)
+           (<= (first range) coord (second range)))
          point
          target))
 
-(defun fire (init-velocity target)
+(defun fire (velocity target)
   (iter    
     (with pos = '(0 0))
-    (with velocity = init-velocity)
-    (until (or (within pos target)
-               (< (second pos) (reduce #'min (second target)))))
     (maximizing (second pos) into max-height)
+    (until (or (within pos target)
+               (< (second pos) (y-min target))
+               (> (first pos) (x-max target))))
     (setf pos (point+ pos velocity))
-    (setf velocity (point+ velocity (list (- (signum (first velocity)))
-                                          -1)))
-    
+    (setf velocity (point+ velocity (list (- (signum (first velocity))) -1)))    
     (finally (return (if (within pos target) max-height nil)))))
+
+(defun x-max (target) (cadar target))
+(defun y-min (target) (caadr target))
 
 (defun day17 (input)
   (let ((target (run-parser (parse-file) input)))
-    (iter      
-      (for x-vel from 1 to 300)
-      (for res = (iter
-         (for y-vel from -500 to 500)
-         (for result = (fire (list x-vel y-vel) target))
-         (when result
-           (counting result))))
-      (when res
-        (summing res)))))
+    (iter outer
+      (for x-vel from 1 to (x-max target))
+      (iter
+        (for y-vel from (y-min target) to (- (y-min target)))
+        (for result = (fire (list x-vel y-vel) target))
+        (when result
+          (in outer (maximizing result into part1))
+          (in outer (counting result into part2))))
+      (finally (return-from outer (list part1 part2))))))
