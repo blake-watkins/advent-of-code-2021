@@ -1,12 +1,15 @@
 (in-package :aoc-2021)
 
+(defun parse-range ()
+  (with-monad
+    (parse-lower-case)
+    (parse-character #\=)
+    (parse-list (parse-number) (parse-string ".."))))
+
 (defun parse-file ()
   (with-monad
-    (parse-string "target area: x=")
-    (assign x (parse-list (parse-number) (parse-string "..")))
-    (parse-string ", y=")
-    (assign y (parse-list (parse-number) (parse-string "..")))
-    (unit (list x y))))
+    (parse-string "target area: ")
+    (parse-list (parse-range) ", ")))
 
 (defun within (point target)
   (every (lambda (coord range)
