@@ -10,176 +10,16 @@
             (unit (list x y)))
           (parse-number)))
 
-;;; MAYBE MONAD
+;; find-explosion-site :: Tree a -> Maybe Zipper a
+(defun find-explosion-site (tree)
+  (find-in-tree tree (lambda (tree-node depth)
+		       (and (listp tree-node) (= 4 depth)))))
 
-(defun maybe-unit (x)
-  (list :just x))
+(defun find-split-site (tree)
+  (find-in-tree tree (lambda (tree-node depth)
+		       (declare (ignore depth))
+		       (and (numberp tree-node) (>= tree-node 10)))))
 
-(defun maybe-bind (ma f)
-  (if (eq (car ma) :just)
-      (funcall f (second ma))
-      (list :nothing)))
-
-(defun maybe-fail ()
-  (list :nothing))
-
-(defun maybe-mplus (ma mb)
-  (if (eq (first ma) :nothing)
-      mb
-      ma))
-
-(defun maybe-mzero ()
-  (maybe-fail))
-
-(defmacro run-maybe (m)
-  `(let ((aoc:*unit-function* 'maybe-unit)
-         (aoc:*bind-function* 'maybe-bind))
-     ,m))
-
-(defmacro from-maybe (ma &optional (default nil))
-  `(let ((aoc:*unit-function* 'maybe-unit)
-         (aoc:*bind-function* 'maybe-bind))
-     (if (eq (car ,ma) :just)
-	 (second ,ma)
-	 ,default)))
-
-;; Haskell Control-Monad-Loops.html
-
-;; Monad m => [a -> m a] -> a -> m a
-(defun concatm (&rest monads)
-  (lambda (value)
-    (if (null monads)
-	(unit value)      
-	(with-monad
-	  (assign new-value (funcall (car monads) value))
-	  (funcall (apply #'concatm (cdr monads)) new-value)))))
-
-;; Monad m => (a -> Bool) -> (a -> m a) -> a -> m a
-(defun iterate-untilm (pred f)
-  (lambda (value)
-    (if (funcall pred value)
-	(unit value)
-	(funcall (concatm f (iterate-untilm pred f)) value))))
-
-;;; ZIPPER
-;; http://learnyouahaskell.com/zippers
-;; Zipper is a two element list - first element is the focus of the structure,
-;; second element is the information needed to move around as a list of breadcrumbs
-
-;; Zipper information
-(defun zipper-tree (zipper)
-  (first zipper))
-
-(defun zipper-crumbs (zipper)
-  (second zipper))
-
-(defun zipper-depth (zipper)
-  "How deep is the zipper. Zero is the root level."
-  (length (zipper-crumbs zipper)))
-
-(defun zipper-rootp (zipper)
-  (null (zipper-crumbs zipper)))
-
-(defun zipper-leafp (zipper)
-  (numberp (zipper-tree zipper)))
-
-(defun zipper-siblingp (type)
-  "TYPE should be :LEFT or :RIGHT. Returns t if zipper is at that type of child"
-  (lambda (zipper)
-    (let ((crumbs (zipper-crumbs zipper)))
-      (and crumbs (eq type (caar crumbs))))))
-
-;; Zipper movement.
-;; All movement return results in a Maybe. Will return :nothing if moved off the
-;; tree
-
-;; goLeft :: Zipper a -> Maybe (Zipper a)
-(defun go-left ()
-  (lambda (zipper)
-    (if (zipper-leafp zipper)
-	(maybe-fail)      
-	(destructuring-bind ((left right) crumbs) zipper
-          (unit (list left (cons (list :left right) crumbs)))))))
-
-(defun go-right ()
-  (lambda (zipper)
-    (if (zipper-leafp zipper)
-	(maybe-fail)
-	(destructuring-bind ((left right) crumbs) zipper
-          (unit (list right (cons (list :right left) crumbs)))))))
-
-(defun go-up ()
-  (lambda (zipper)
-    (if (zipper-rootp zipper)
-	(maybe-fail)
-	(destructuring-bind (tree ((crumb-type crumb) . crumbs)) zipper
-          (if (eq crumb-type :left)
-              (unit (list (list tree crumb) crumbs))
-              (unit (list (list crumb tree) crumbs)))))))
-
-(defun go-topmost ()
-  (iterate-untilm #'zipper-rootp (go-up)))
-
-(defun go-leftmost ()
-  (iterate-untilm #'zipper-leafp (go-left)))
-
-(defun go-rightmost ()
-  (iterate-untilm #'zipper-leafp (go-right)))
-
-(defun go-right-sibling ()
-  "Go to the closest right sibling in the tree. Fails if none exists. "
-  (concatm (iterate-untilm (zipper-siblingp :left) (go-up)) (go-up) (go-right)))
-
-(defun go-left-sibling ()
-  "Go to the closest left sibling in the tree. Fails if none exists. "
-  (concatm (iterate-untilm (zipper-siblingp :right) (go-up)) (go-up) (go-left)))
-
-(defun go-next ()
-  "Go to next inorder leaf of the tree. Fails if none exists. "
-  (concatm (go-right-sibling) (go-leftmost)))
-
-(defun go-prev ()
-  "Go to previous inorder leaf of the tree. Fails is none exists. "
-  (concatm (go-left-sibling) (go-rightmost)))
-
-;; Zipper modification functions
-
-;; modify :: (a -> b) -> Zipper a -> Maybe Zipper b
-(defun modify (f)
-  "Returns zipper with a the value at the focus modified by the function if at a leaf. Otherwise fails. "
-  (lambda (zipper)
-    (if (zipper-leafp zipper)
-	(unit (list (funcall f (zipper-tree zipper))
-		    (zipper-crumbs zipper)))
-	(maybe-fail))))
-
-(defun attach (new-tree)
-  (lambda (zipper)
-    (unit (list new-tree (zipper-crumbs zipper)))))
-
-;; find-explosion-site :: Zipper a -> Maybe Zipper a
-(defun find-explosion-site (zipper)
-  (cond
-    ((zipper-leafp zipper) (maybe-fail))
-    ((= 4 (zipper-depth zipper)) (unit zipper))
-    (t (maybe-mplus
-	(with-monad
-	  (assign left (funcall (go-left) zipper))
-	  (find-explosion-site left))
-	(with-monad
-	  (assign right (funcall (go-right) zipper))
-	  (find-explosion-site right))))))
-
-(defun find-split-site (zipper)
-  (if (and (zipper-leafp zipper) (>= (zipper-tree zipper) 10))
-      (unit zipper)
-      (maybe-mplus
-       (with-monad
-	 (assign left (funcall (go-left) zipper))
-	 (find-split-site left))
-       (with-monad
-	 (assign right (funcall (go-right) zipper))
-	 (find-split-site right)))))
 
 (defun dont-fail (f)
   (lambda (zipper)
@@ -189,50 +29,49 @@
 
 ;; add-previous :: Int -> Zipper a -> Maybe Zipper a
 (defun add-previous (n)
-  (concatm (go-prev)
-	   (modify (lambda (x) (+ x n)))
-	   (go-next)))
+  (dont-fail
+   (concatm (go-prev)
+	    (modify (lambda (x) (+ x n)))
+	    (go-next))))
+
 (defun add-next (n)
-  (concatm (go-next)
-	   (modify (lambda (x) (+ x n)))
-	   (go-prev)))
+  (dont-fail
+   (concatm (go-next)
+	    (modify (lambda (x) (+ x n)))
+	    (go-prev))))
 
-(defun explode ()
-  (lambda (zipper)
-    (with-monad
-      (assign explosion-site (find-explosion-site zipper))
-      (let ((tree (zipper-tree explosion-site)))
-	(funcall (concatm 
-		  (attach 0)
-		  (dont-fail (add-previous (first tree)))
-		  (dont-fail (add-next (second tree))))
-		 explosion-site)))))
+;; explode :: Tree -> Maybe Tree
+(defun explode (tree)
+  (with-monad
+    (assign explosion-site (find-explosion-site tree))
+    (assign ret (let ((pair (zipper-tree explosion-site)))
+		  (funcall (concatm 
+			    (attach 0)
+			    (add-previous (first pair))
+			    (add-next (second pair)))
+			   explosion-site)))
+    (unit (zipper-to-tree ret))))
 
-(defun split ()
-  (lambda (zipper)
-    (with-monad
-      (assign split-site (find-split-site zipper))
-      (let ((tree (zipper-tree split-site)))
-	(funcall (attach (list (floor tree 2) (ceiling tree 2)))
-		 split-site)))))
-
-(defun reduce-snailnum ()
-  (lambda (zipper)
-    (funcall (concatm
-	      (go-topmost)
-	      (lambda (zipper)
-		(maybe-mplus
-		 (funcall (explode) zipper)
-		 (funcall (split) zipper)))
-	      (go-topmost))
-	     zipper)))
+(defun split (tree)
+  (with-monad
+    (assign split-site (find-split-site tree))
+    (assign ret (let* ((number (zipper-tree split-site))
+		       (new-pair (list (floor number 2)
+				       (ceiling number 2))))
+		  (funcall (attach new-pair) split-site)))
+    (unit (zipper-to-tree ret))))
 
 (defun reduce-snailnum-fully (snail-num)
   (iter
-    (for reduced = (from-maybe (funcall (reduce-snailnum)
-					(list snail-num nil))))
-    (while reduced)
-    (setf snail-num (first reduced))
+    (for exploded = (from-maybe (explode snail-num)))
+    (when exploded
+      (setf snail-num exploded)
+      (next-iteration))
+    (for split = (from-maybe (split snail-num)))
+    (when split
+      (setf snail-num split)
+      (next-iteration))
+    (while (or exploded split))
     (finally (return snail-num))))
 
 (defun add-snailnums (acc v)
