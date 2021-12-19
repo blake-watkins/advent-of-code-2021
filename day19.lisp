@@ -175,8 +175,8 @@
 
 (defun day19 (input &optional (matches-required 12))
   (let* ((parsed (run-parser (parse-file) input))
-         (pairwise-transforms (get-pairwise-transforms parsed
-                                                       matches-required))
+         (pairwise-transforms
+           (get-pairwise-transforms parsed matches-required))
          (transform-map (get-reference-transform-map pairwise-transforms))
          (all-beacons (fset:empty-set))
          (all-scanners (fset:empty-set)))
