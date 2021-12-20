@@ -105,22 +105,32 @@
 ;; id1's frame. 
 (defun get-pairwise-transforms (scanners matches-required)
   (let ((uf (make-uf))
-        (matches (fset:empty-map)))
+        (ret (fset:empty-map))
+        (beacons-map (fset:empty-map)))
     (iter
-      (for (id nil) in scanners)
+      (for (id beacons) in scanners)
+      (fset:includef beacons-map id beacons)
       (uf-make-set id uf))
-    
-    (iter
-      (for ((id-1 beacons-1) (id-2 beacons-2)) in (pairs scanners))
-      (unless (= (uf-find id-1 uf) (uf-find id-2 uf))
-        (for match = (match-points beacons-1 beacons-2 matches-required))
-        (when match
-          (format t "Linked ~a ~a~%" id-1 id-2)
-          (uf-union id-1 id-2 uf)
-          (fset:includef matches (list id-1 id-2) (cons :normal match))
-          (fset:includef matches (list id-2 id-1) (cons :inverted match)))))
 
-    matches))
+    (iter
+      (for (id-1 . matches) in-fset (prematch-pairs scanners
+                                                    matches-required))
+      (for beacons-1 = (fset:lookup beacons-map id-1))
+      (iter
+        (for id-2 in-fset matches)
+        (for beacons-2 = (fset:lookup beacons-map id-2))
+
+        (unless (= (uf-find id-1 uf) (uf-find id-2 uf))
+          (for match = (match-points beacons-1 beacons-2 matches-required))
+          (when match
+            (format t "Linked ~a ~a~%" id-1 id-2)
+            (uf-union id-1 id-2 uf)
+            (fset:includef ret (list id-1 id-2)
+                           (cons :normal match))
+            (fset:includef ret (list id-2 id-1)
+                           (cons :inverted match))))))
+
+    ret))
 
 ;; Return a map keyed by scanner id of the transform needed to get closer to
 ;; the reference frame. The map keys are scanner ids, the values are a list
@@ -172,6 +182,60 @@
          (transform-points points rotation translation inverted)
          next-frame
          transform-map))))
+
+(defun get-coordinate-difference-bags (beacons)
+  (iter
+    (with ret = (iter
+                  (repeat (length (fset:arb beacons)))
+                  (collect (fset:empty-bag))))
+    (for (a . rest) on (fset:convert 'list beacons))
+    
+    (iter
+      (for b in rest)
+      (iter
+        (with diff = (point-abs (point- b a)))
+        (for i from 0)
+        (for d in diff)
+        (fset:includef (elt ret i) d)))
+    (finally (return ret))))
+
+(defun prematch-pairs (scanners matches-required)
+  (let ((diffs-required (floor (* matches-required (1- matches-required)) 2))
+        (coord-bags (iter
+                      (with ret = (fset:empty-map))
+                      (for (id scanner) in scanners)
+                      (fset:includef
+                       ret id
+                       (get-coordinate-difference-bags scanner))
+                      (finally (return ret))))
+        (ret (fset:empty-map)))
+    (iter
+      (with initial-set = (fset:convert 'fset:set
+                                        (iter
+                                          (for (id nil) in scanners)
+                                          (collect id))))
+      (for (id nil) in scanners)
+      (fset:includef ret id initial-set)
+      (fset:excludef (fset:lookup ret id) id))
+    
+    (iter
+      (for id in-fset coord-bags)
+      (iter
+        (for coords in (fset:lookup coord-bags id))
+        (iter
+          (for other-id in-fset coord-bags)
+          (when (/= id other-id)
+            (unless (fset:find-if 
+                     (lambda (bag)
+                       (>= (fset:size (fset:intersection
+                                       bag coords))
+                           diffs-required))
+                     (fset:lookup coord-bags other-id))
+              (fset:excludef (fset:lookup ret id) other-id)))))
+      (finally (return (fset:sort (fset:convert 'fset:seq ret)
+                                  #'<
+                                  :key (lambda (x)
+                                         (fset:size (cdr x)))))))))
 
 (defun day19 (input &optional (matches-required 12))
   (let* ((parsed (run-parser (parse-file) input))
