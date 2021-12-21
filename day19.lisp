@@ -77,26 +77,22 @@
 ;;   - for every possible rotation (24)
 ;;   - for every pair of possible points in the reference and other set
 ;;   - find the translation that would match those two points
-;;   - translate all of the other set of points and check whether there are
-;;     enough matches.
-;;   - if there are, return the rotation matrix and the translation vector
+;;   - keep track of all the translations, if there's a translation that
+;;     happens as many times as matches-required, then thats it.
 (defun match-points (ref-points points matches-required)
   (iter outer
     (for rotation-matrix in *all-rotations*)
     (for rotator = (matrix-apply rotation-matrix))    
     (for rotated-points = (fset:image rotator points))
     (iter
+      (with translations = (fset:empty-map 0))
       (for ref-point in-fset ref-points)
       (iter
         (for point in-fset rotated-points)
         (for translation = (point- ref-point point))
-        (for translated = (fset:image (lambda (point)
-                                        (point+ point translation))
-                                      rotated-points))
-        (for common-points = (fset:intersection ref-points translated))
-        (in outer (finding (list rotation-matrix translation)
-                           such-that (>= (fset:size common-points)
-                                         matches-required)))))))
+        (for count = (incf (fset:lookup translations translation)))
+        (in outer (finding (list rotation-matrix translation) such-that
+                           (>= count matches-required)))))))
 
 ;; Given a list of (id beacon-list) lists representing scanners and their
 ;; beacons, return a map of pairwise transformations to transform between
@@ -125,10 +121,8 @@
           (when match
             (format t "Linked ~a ~a~%" id-1 id-2)
             (uf-union id-1 id-2 uf)
-            (fset:includef ret (list id-1 id-2)
-                           (cons :normal match))
-            (fset:includef ret (list id-2 id-1)
-                           (cons :inverted match))))))
+            (fset:includef ret (list id-1 id-2) (cons :normal match))
+            (fset:includef ret (list id-2 id-1) (cons :inverted match))))))
 
     ret))
 
