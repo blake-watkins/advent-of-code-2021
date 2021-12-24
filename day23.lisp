@@ -20,6 +20,14 @@
                                         (#\D :d)))))
     (finally (return ret))))
 
+(defparameter *hallway* '((1 1) (1 2) (1 4) (1 6) (1 8) (1 10) (1 11)))
+
+(defparameter *costs* '((:a . 1) (:b . 10) (:c . 100) (:d . 1000)))
+
+(defparameter *targets* '((:a . (2 3)) (:b . (2 5)) (:c . (2 7)) (:d . (2 9))))
+
+;; evaluate either of these two progn's to set up for part 1/2. then evaluate
+;; *room-map* and *move-tree*
 (progn
   (defparameter *input* "#############
 #...........#
@@ -60,6 +68,7 @@
   #.#.#.#.#
   #########")))
 
+;; precompute tree of moves from each position
 (defparameter *move-tree*
   (let ((tree (make-hash-table :test 'equal)))
     (labels ((move-tree-rec (current last)
@@ -78,12 +87,7 @@
       (move-tree-rec '(1 1) nil)
       tree)))
 
-(defparameter *hallway* '((1 1) (1 2) (1 4) (1 6) (1 8) (1 10) (1 11)))
-
-(defparameter *costs* '((:a . 1) (:b . 10) (:c . 100) (:d . 1000)))
-
-(defparameter *targets* '((:a . (2 3)) (:b . (2 5)) (:c . (2 7)) (:d . (2 9))))
-
+;; precompute each room's type
 (defparameter *room-map*
   (let ((ret (make-hash-table :test 'equal)))
     (iter
@@ -98,19 +102,19 @@
 	(setf (gethash room ret) bug-type)))
     ret))
 
-
-
-;; if in pod, can move to any reachable square in hallway or own pod apart from
-;; prohibited ones
-;; if in the hallway, must wait until can move to their pod until it's reachable
-;;   and there's no other type of bug there already
-
-(defun can-enter-pod (bug-type bugs)
-  (let ((rooms (cdr (assoc bug-type *rooms* :test 'equal))))
-    (iter
-      (for room in rooms)
-      (for occupant = (fset:lookup bugs room) )
-      (always (or (null occupant) (eq bug-type occupant))))))
+;; Return t if the pod for BUG-TYPE is full, the topmost empty square if it's
+;; partially filled with the correct type of bugs, or nil if there are other bugs
+;; there. 
+(defun pure-pod (bug-type bugs)
+  (let ((ret (iter
+	       (for room in (cdr (assoc bug-type *rooms* :test 'equal)))
+	       (for occupant = (fset:lookup bugs room))
+	       (finding room such-that (or (null occupant)
+					   (not (eq bug-type occupant)))))))
+    (cond
+      ((null ret) t)
+      ((null (fset:lookup bugs ret)) ret)
+      (t nil))))
 
 (defun reachable (pos bugs)
   (labels ((reachable-rec (current last distance)
@@ -128,21 +132,6 @@
 ;; in in hallway, can move to bottom of own pod if it's reachable and (empty or
 ;; has same as you
 ;; if in other pod, can move to any reachable hallway
-
-;; Return t if the pod for BUG-TYPE is full, the topmost empty square if it's
-;; partially filled with the correct type of bugs, or nil if there are other bugs
-;; there. 
-(defun pure-pod (bug-type bugs)
-  (let ((ret (iter
-	       (for room in (cdr (assoc bug-type *rooms* :test 'equal)))
-	       (for occupant = (fset:lookup bugs room))
-	       (finding room such-that (or (null occupant)
-					   (not (eq bug-type occupant)))))))
-    (cond
-      ((null ret) t)
-      ((null (fset:lookup bugs ret)) ret)
-      (t nil))))
-
 (defun get-moves (pos bugs)
   (let ((bug-type (fset:lookup bugs pos))
 	(room-type (gethash pos *room-map*)))
@@ -166,44 +155,6 @@
 			  (declare (ignore dist))
 			  (eq (gethash square *room-map*) :hallway))
 			(reachable pos bugs))))))
-(defun get-moves (pos bugs)
-  (let ((reachable (reachable pos bugs)))
-    (cond
-      ((or (in-own-pod pos bugs) (in-other-pod pos bugs))
-       (fset:filter (lambda (square dist)
-                      (declare (ignore dist))
-                      (not (fset:contains? *prohibited-stops* square)))
-                    reachable))
-      (t
-       (let ((pod-squares (pod-squares pos bugs)))
-         (fset:filter (lambda (square dist)
-                        (declare (ignore dist))
-                        (fset:contains? pod-squares square))
-                      reachable))))))
-
-(defun in-own-pod (bug-pos bugs)
-  (find bug-pos (assoc (fset:lookup bugs bug-pos) *rooms*) :test 'equal))
-
-(defun in-other-pod (bug-pos bugs)
-  (iter
-    (for (bug-type . rooms) in *rooms*)
-    (thereis (and (find bug-pos rooms :test 'equal)
-                  (not (eq (fset:lookup bugs bug-pos) bug-type))))))
-
-(defun pod-squares (pos bugs &optional (own t))
-  (let ((bug-type (fset:lookup bugs pos)))
-    (iter
-      (with ret = (fset:empty-set))
-      (for (type . rooms) in *rooms*)
-      (iter
-        (for room in rooms)
-        (when (or (and (not own) (not (eq type bug-type)))
-                  (and own (eq type bug-type)))
-          (fset:includef ret room)))
-      (finally (return ret)))))
-
-
-
 (defun find-bugs (map)
   (iter
     (with ret = (fset:empty-map))
@@ -231,8 +182,10 @@
 (defun finished (bugs)
   (iter
     (for bug in-fset bugs)
-    (always (in-own-pod bug bugs))))
+    (always (eq (fset:lookup bugs bug)
+		(gethash bug *room-map*)))))
 
+;; manhattan distance to top of pod - can often underestimate but that's okay
 (defun heuristic (bugs)
   (iter
     (for bug in-fset bugs)
@@ -256,72 +209,23 @@
                           (collect #\.))
                          (t (collect #\#))))))))
 
-(defun part1 (map)
-  (a-star
-   (find-bugs map)
-   (lambda (vertex parent distance)
-     (when parent
-       ;;(format t "Parent:~%")
-       ;;(print-map parent)
-       )
-     ;;(format t "Current:~%")
-     ;;(print-map vertex)
-     ;;(format t "Distance: ~a~%" distance)
-     ;;(break)
-     (when (finished vertex)       
-       (format t "~a vertex ~a~%" vertex distance)
-       (break)))
-   #'next-states
-   #'heuristic))
+(define-condition found (condition) 
+  ((value :initarg :value :reader value)))
+
+(defun part2 (bugs)
+  (handler-case 
+      (a-star
+       bugs
+       (lambda (vertex parent distance)
+	 (declare (ignore parent))
+	 (when (finished vertex)
+	   (signal 'found :value distance)))
+       #'next-states
+       #'heuristic)
+    (found (obj)
+      (format t "~a~%" (value obj)))))
 
 (defun day23 (input)
-  (let* ((parsed (run-parser (parse-file) input))
-         (map (get-map parsed)))
-    map
-    ))
-
-
-(defun a-star (vertex vertex-fn neighbours-fn heuristic-fn)
-  (let ((visited (fset:empty-set))
-	(g-score (fset:empty-map))
-	(open-set (make-instance 'cl-heap:priority-queue)))
-    (fset:includef g-score vertex 0)
-    (cl-heap:enqueue open-set (list vertex nil) 0)
-    
-    (loop until (= 0 (cl-heap:queue-size open-set))
-	  for (current current-parent) = (cl-heap:dequeue open-set)
-	  for current-distance = (fset:lookup g-score current)
-	  unless (fset:lookup visited current)
-	  do
-	     (fset:includef visited current)
-	     (funcall vertex-fn current current-parent current-distance)
-
-	     (loop for (neighbour neighbour-distance)
-		   in (funcall neighbours-fn current)
-		   unless (fset:lookup visited neighbour)
-		   do
-		      (let ((tentative-distance (+ current-distance
-						   neighbour-distance)))
-
-			(when (or (null (fset:lookup g-score neighbour))
-				  (< tentative-distance
-				     (fset:lookup g-score neighbour)))
-			  (fset:includef g-score neighbour tentative-distance)
-                          (cl-heap:enqueue open-set
-					   (list neighbour current)
-					   (+ tentative-distance
-                                              (funcall heuristic-fn
-                                                       neighbour)))))))
-    nil))
-
-(defun memo (f)
-  (let ((cache (fset:empty-map)))
-    (lambda (&rest args)
-      (let ((cached (fset:lookup cache args)))
-        (if cached
-            cached
-            (let ((ret (apply f args)))
-              (fset:includef cache args ret)
-              ret))))))
-(setf (symbol-function 'reachable) (memo #'reachable))
-(setf (symbol-function 'heuristic) (memo #'heuristic))
+  (let* ((map (get-map input))
+	 (bugs (find-bugs map)))
+    (part2 bugs)))
