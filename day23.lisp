@@ -22,6 +22,8 @@
 
 (defparameter *hallway* '((1 1) (1 2) (1 4) (1 6) (1 8) (1 10) (1 11)))
 
+(defparameter *prohibited* '((1 3) (1 5) (1 7) (1 9)))
+
 (defparameter *costs* '((:a . 1) (:b . 10) (:c . 100) (:d . 1000)))
 
 (defparameter *targets* '((:a . (2 3)) (:b . (2 5)) (:c . (2 7)) (:d . (2 9))))
