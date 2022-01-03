@@ -11,20 +11,15 @@
 
 ;; CLASSES
 
-;; Region is a superclass representing either a single box or a collection of
-;; boxes in a oct-tree.
-(defclass region ()
-  ((region :initarg :region :accessor region)))
-
 ;; Box is a cuboid of space all with the same state.
-(defclass box (region)
+(defclass box ()
   ((bottom-left :initarg :bottom-left :accessor bottom-left)
    (top-right :initarg :top-right :accessor top-right)
    (state :initarg :state :accessor state)))
 
-;; Node has 2^d children - d is the dimension of the region. Each child is either
-;; a box or another node and is fully contained in node. 
-(defclass node (region)
+;; Node is a collection of up to 2^d children - d is the dimension of the region.
+;; Each child is either a box or another node and is fully contained in node. 
+(defclass node ()
   ((children :initarg :children :accessor children)))
 
 
@@ -72,13 +67,6 @@
            (bottom-left box-2)
            (top-right box-2))))
 
-(defun box-midpoint (box)
-  "Return the midpoint of the box (rounded 'down' if a dimension is even). "
-  (mapcar (lambda (bottom-left top-right)
-            (floor (+ bottom-left top-right) 2))
-          (bottom-left box)
-          (top-right box)))
-
 (defun box-corners (box)
   "Return a list of all 2^d corners of the box."
   (labels ((box-corners-rec (a b)
@@ -103,9 +91,9 @@
   "Split box at split-point into up to 2^d other boxes."
   (let ((ret (empty-set)))
     ;; Build a list of the bottom left and top right coords in ACC-BL ACC-TR. 
-    ;; A, B, M hold the original box coordinates and midpoint.
-    (labels ((box-split-rec (a b m acc-bl acc-tr)
-               (if (or  (null a) (null b) (null m))
+    ;; A, B, S hold the original box coordinates and splitpoint.
+    (labels ((box-split-rec (a b s acc-bl acc-tr)
+               (if (or  (null a) (null b) (null s))
                    (includef ret
 			     (make-instance 'box
 					    :bottom-left (reverse acc-bl)
@@ -114,13 +102,13 @@
                    (progn
 		     ;; Make a recursive call for the bottom and top halves
 		     ;; of each dimension if those halves are bigger than 0
-                     (when (>= (- (car m) (car a)) 1)
-                       (box-split-rec (cdr a) (cdr b) (cdr m)
+                     (when (>= (- (car s) (car a)) 1)
+                       (box-split-rec (cdr a) (cdr b) (cdr s)
                                       (cons (car a) acc-bl)
-                                      (cons (car m) acc-tr)))
-                     (when (>= (- (car b) (car m)) 1)
-                       (box-split-rec (cdr a) (cdr b) (cdr m)
-                                      (cons (car m) acc-bl)
+                                      (cons (car s) acc-tr)))
+                     (when (>= (- (car b) (car s)) 1)
+                       (box-split-rec (cdr a) (cdr b) (cdr s)
+                                      (cons (car s) acc-bl)
                                       (cons (car b) acc-tr)))))))
       (box-split-rec (bottom-left box)
                      (top-right box)
@@ -131,30 +119,18 @@
 
 
 ;; ADD-BOX
-;; Add a box behind existing boxes to a region / box / node.
+;; Add a box behind existing boxes.
 
 (defgeneric add-box (region box))
 
-(defmethod add-box ((region region) (new-box box))
-  (setf (region region) (add-box (region region) new-box)))
-
-
-(defun closest-corner-to-midpoint (midpoint-of corners-of)
-  (let* ((corners (box-corners corners-of))
-         (midpoint (box-midpoint midpoint-of))
-         (enclosing-corners (box-corners midpoint-of))
-         (distances (mapcar (lambda (corner)
-                              (list corner (manhattan corner midpoint)))
-                            (fset:filter (lambda (corner)
-                                           (not (find corner enclosing-corners
-                                                      :test 'equal)))
-                                    corners))))
-    (car (first (sort distances #'< :key #'second)))))
-
-(defun remove-empties (boxes)
-  (fset:filter (lambda (box)
-                 (not (eq (state box) :empty)))
-               boxes))
+(defun split-corner (enclosing-box split-box)
+  "Find a corner to split on. This is a corner of the intersection between the two boxes that is not already a corner of the enclosing box. "
+  (let* ((intersection (box-intersection enclosing-box split-box))
+         (enclosing-corners (box-corners enclosing-box))
+         (corners (box-corners intersection)))
+    (car (fset:filter (lambda (corner)
+                             (not (find corner enclosing-corners :test 'equal)))
+                           corners))))
 
 (defmethod add-box ((orig-region box) (new-box box))
   (if (box-contains new-box orig-region)
@@ -166,7 +142,7 @@
           orig-region)
       (if (and (eq (state orig-region) :empty)
                (box-intersectp new-box orig-region))
-          (let ((split-point (closest-corner-to-midpoint orig-region new-box)))
+          (let ((split-point (split-corner orig-region new-box)))
             (add-box (make-instance 'node
                                     :children (box-split orig-region split-point))
                      new-box))
@@ -180,12 +156,9 @@
 
 
 ;; COUNT-TYPE
-;; Count pixels of the given type in the region / box / node
+;; Count pixels of the given type in the box / node
 
 (defgeneric count-type (region type))
-
-(defmethod count-type ((region region) type)
-  (count-type (region region) type))
 
 (defmethod count-type ((box box) type)
   (if (eq (state box) type) (box-size box) 0))
@@ -217,9 +190,6 @@
 
 
 ;; PRINT-OBJECT 
-(defmethod print-object ((region region) stream)
-  (print-object (region region) stream))
-
 (defmethod print-object ((box box) stream)
   (let ((*print-pretty* nil))
     (print-unreadable-object (box stream :type t)
@@ -242,10 +212,10 @@
     (with parsed = (run-parser (parse-file) input))
     (with ret = (fset:empty-seq))
     (for (state ranges) in parsed)
-    (let ((box (make-instance 'box :bottom-left (mapcar #'first ranges)
-                                   :top-right (mapcar #'1+
-                                                      (mapcar #'second ranges))
-                                   :state state)))
+    (let ((box (make-instance 'box
+                              :bottom-left (mapcar #'first ranges)
+                              :top-right (mapcar #'1+ (mapcar #'second ranges))
+                              :state state)))
       (setf ret (fset:with-first ret box)))
     (finally (return ret))))
 
@@ -261,41 +231,18 @@
                    :state :empty)))
     box))
 
-(defparameter *i* "on x=-45..7,y=-17..27,z=5..49
-on x=-47..6,y=-17..30,z=-24..26")
-
-
-(defun day22-2 (input)
-  (let* ((boxes (get-boxes input))
-         (region (bounding-box boxes)))
-    (setf boxes (fset:filter (lambda (box)
-                               (box-contains region box))
-                             boxes))
-    (iter
-      (for box in-fset boxes)
-      (setf region (add-box region box))
-      (finally (return (count-type region :on))))))
-
-(defun process (state map point ranges)
-  (if (null ranges)
-      (fset:includef map (reverse point) state)
+(defun day22 (input &optional (part 2))
+  (let ((boxes (get-boxes input)))
+    (when (= part 1)
+      (let ((initialization-region (make-instance 'box
+                                                  :bottom-left '(-50 -50 -50)
+                                                  :top-right '(51 51 51)
+                                                  :state :empty)))        
+        (setf boxes (fset:filter (lambda (box)
+                                   (box-contains initialization-region box))
+                                 boxes))))
+    (let ((region (bounding-box boxes)))
       (iter
-        (with range = (car ranges))
-        (for i from (first range) to (second range))
-        (setf map (process state map (cons i point) (cdr ranges)))))
-  map)
-
-(defun day22 (input)
-  (let ((parsed (run-parser (parse-file) input))
-        (map (fset:empty-map :off)))
-    (iter
-      (for (state ranges) in parsed)
-      (when (every (lambda (range)
-                     (and (<= -50 (first range) 50)
-                          (<= -50 (second range) 50)))
-                   ranges)
-        (setf map (process state map '() ranges))))
-
-    (iter
-      (for coord in-fset map)
-      (counting (eq (fset:lookup map coord) :on)))))
+        (for box in-fset boxes)
+        (setf region (add-box region box))
+        (finally (return (count-type region :on)))))))
