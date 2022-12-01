@@ -5,7 +5,8 @@
     (assign opcode (parse-keyword))
     (parse-space)
     (assign operands (parse-list (either (parse-number)
-                                         (parse-keyword)) #\Space))
+                                         (parse-keyword))
+                                 #\Space))
     (unit (list opcode operands))))
 
 (defun program (instructions)
@@ -83,8 +84,7 @@
         (push-stack choice)
         (with-monad
           (assign target (pop-stack))
-          (guard (= choice (apply #'+ target)))))
-    ))
+          (guard (= choice (apply #'+ target)))))))
 
 (defun op (opcode operands)
   (let ((reg (first operands))

@@ -182,10 +182,14 @@
                             (cdr (assoc (fset:lookup bugs bug) *costs*)))))))))
 
 (defun finished (bugs)
+  "Return t if all bugs are in their own pods. "
   (iter
     (for bug in-fset bugs)
     (always (eq (fset:lookup bugs bug)
 		(gethash bug *room-map*)))))
+
+(defun in-own-pod (bug-pos bugs)
+  (find bug-pos (assoc (fset:lookup bugs bug-pos) *rooms*) :test 'equal))
 
 ;; manhattan distance to top of pod - can often underestimate but that's okay
 (defun heuristic (bugs)
@@ -203,19 +207,20 @@
             (for r below 7)
             (collect
                 (iter
-                       (for c below 13)
-                       (cond
-                         ((fset:domain-contains? bugs (list r c))
-                          (collect (symbol-name (fset:lookup bugs (list r c)))))
-                         ((fset:domain-contains? *map* (list r c))
-                          (collect #\.))
-                         (t (collect #\#))))))))
+                  (for c below 13)
+                  (cond
+                    ((fset:domain-contains? bugs (list r c))
+                     (collect (symbol-name (fset:lookup bugs (list r c)))))
+                    ((fset:domain-contains? *map* (list r c))
+                     (collect #\.))
+                    (t (collect #\#))))))))
 
 (define-condition found (condition) 
   ((value :initarg :value :reader value)))
 
-(defun part2 (bugs)
-  (handler-case 
+(defun day23 (input)
+  (let ((bugs (find-bugs (get-map input))))
+    (handler-case 
       (a-star
        bugs
        (lambda (vertex parent distance)
@@ -225,9 +230,4 @@
        #'next-states
        #'heuristic)
     (found (obj)
-      (format t "~a~%" (value obj)))))
-
-(defun day23 (input)
-  (let* ((map (get-map input))
-	 (bugs (find-bugs map)))
-    (part2 bugs)))
+      (format t "~a~%" (value obj))))))
